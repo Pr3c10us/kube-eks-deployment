@@ -10,7 +10,7 @@ data "aws_eks_cluster_auth" "eks" {
 
 
 provider "aws" {
-  region = data.aws_region.current.name
+  region = "${data.aws_region.current.name}"
 }
 
 module "vpc" {
