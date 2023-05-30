@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "python-api.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "python-api.name" . }}
+    helm.sh/chart: {{ include "python-api.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "python-api.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "python-api.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: Always
+          env:
+            - name: EXTRA_DAY_NAME
+              value: Oswald
+            - name: EXTRA_DAY_ID
+              value: {{ index .Values.extraDays (include "python-api.environment" .) | .id }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
