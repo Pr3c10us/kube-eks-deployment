@@ -35,9 +35,9 @@ module "eks_cluster" {
   cluster_name    = "my-eks-cluster"
   cluster_version = "1.24"
 
-  vpc_id     = module.vpc.vpc_id
-  subnets    = module.vpc.private_subnets
-  kubeconfig_aws_authenticator_additional_args = ["--region", data.aws_region.current.name]
+  vpc_id        = module.vpc.vpc_id
+  subnet_ids    = module.vpc.private_subnets
+  #kubeconfig_aws_authenticator_additional_args = ["--region", data.aws_region.current.name]
 
   worker_groups = [
     {
