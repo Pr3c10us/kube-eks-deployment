@@ -1,117 +1,150 @@
+data "aws_region" "current" {}
+data "aws_eks_cluster" "eks" {
+  name = module.eks_cluster.cluster_id
+}
+
+data "aws_eks_cluster_auth" "eks" {
+  name = module.eks_cluster.cluster_id
+}
+
+
+
 provider "aws" {
-  region = "us-east-1"  # Replace with your desired AWS region
+  region = "us-east-1"
 }
 
-# Create the S3 bucket for the static website
-resource "aws_s3_bucket" "website" {
-  bucket = "bakri-20-15-29"
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "5.0.0"
+
+  name = "my-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["${data.aws_region.current.name}a", "${data.aws_region.current.name}b", "${data.aws_region.current.name}c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+  enable_nat_gateway = true
+  single_nat_gateway = true
 }
 
-# Set the ACL for the S3 bucket
-resource "aws_s3_bucket_acl" "website" {
-  bucket = aws_s3_bucket.website.id
+module "eks_cluster" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 19.0"
 
-  # Set the bucket ACL to public-read
-  acl = "public-read"
-}
+  cluster_name    = "my-eks-cluster"
+  cluster_version = "1.24"
 
-# Configure the website properties of the S3 bucket
-resource "aws_s3_bucket_website_configuration" "website" {
-  bucket = aws_s3_bucket.website.id
-  index_document {
-    suffix = "index.html"
-  }
-}
+  vpc_id        = module.vpc.vpc_id
+  subnet_ids    = module.vpc.private_subnets
+  #kubeconfig_aws_authenticator_additional_args = ["--region", data.aws_region.current.name]
 
-# Upload the HTML file to the S3 bucket
-resource "null_resource" "upload_html" {
-  provisioner "local-exec" {
-    command = "aws s3 cp index.html s3://${aws_s3_bucket.website.id}/index.html"
-  }
+  eks_managed_node_groups = {
+  blue = {}
+  green = {
+    min_size     = 1
+    max_size     = 3
+    desired_size = 3
 
-  depends_on = [aws_s3_bucket_acl.website]
-}
+    instance_types = ["t3.micro"]
+#     capacity_type  = "SPOT"
+#     labels = {
+#       Environment = "test"
+#       GithubRepo  = "terraform-aws-eks"
+#       GithubOrg   = "terraform-aws-modules"
+#     }
 
-# Create a Route53 zone
-resource "aws_route53_zone" "example" {
-  name = "opeluther001.com"  # Replace with your desired domain name
-}
+#     taints = {
+#       dedicated = {
+#         key    = "dedicated"
+#         value  = "gpuGroup"
+#         effect = "NO_SCHEDULE"
+#       }
+#     }
 
-# Create an ACM certificate
-resource "aws_acm_certificate" "example" {
-  domain_name       = "opeluther001.com"  # Replace with your domain name
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Create a Route53 record pointing to the S3 bucket
-resource "aws_route53_record" "website" {
-  zone_id = aws_route53_zone.example.zone_id
-  name    = "opeluther001.com"  # Replace with your desired domain name
-  type    = "A"
-
-  alias {
-    name                   = aws_s3_bucket.website.bucket_regional_domain_name
-    zone_id                = aws_s3_bucket.website.hosted_zone_id
-    evaluate_target_health = false
-  }
-
-  depends_on = [aws_s3_bucket.website, aws_route53_zone.example]
-}
-
-# Create the CloudFront distribution for the S3 bucket
-resource "aws_cloudfront_distribution" "website" {
-  origin {
-    domain_name = aws_s3_bucket.website.bucket_regional_domain_name
-    origin_id   = "S3-${aws_s3_bucket.website.id}"
-  }
-
-  enabled             = true
-  default_root_object = "index.html"
-
-  default_cache_behavior {
-    target_origin_id = "S3-${aws_s3_bucket.website.id}"
-    forwarded_values {
-      query_string = false
-      cookies {
-        forward = "none"
-      }
+    update_config = {
+      max_unavailable_percentage = 33 # or set `max_unavailable`
     }
-    viewer_protocol_policy = "redirect-to-https"
-    min_ttl                = 0
-    default_ttl            = 3600
-    max_ttl                = 86400
-    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
-    cached_methods         = ["GET", "HEAD", "OPTIONS"]
-  }
 
-  restrictions {
-    geo_restriction {
-      restriction_type = "none"
+    tags = {
+      ExtraTag = "example"
     }
   }
+}
+}
 
-  viewer_certificate {
-    acm_certificate_arn = aws_acm_certificate.example.arn
-    ssl_support_method  = "sni-only"
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    }
+  }
+}
+
+resource "kubernetes_namespace" "dev" {
+  metadata {
+    name = "dev"
+  }
+}
+
+resource "kubernetes_namespace" "prod" {
+  metadata {
+    name = "prod"
+  }
+}
+
+resource "helm_release" "external_dns" {
+  name       = "external-dns"
+  namespace  = kubernetes_namespace.dev.metadata.0.name
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "external-dns"
+  version    = "6.20.3"
+
+  set {
+    name  = "txtOwnerId"
+    value = var.unique_owner_id
   }
 
-  aliases = ["opeluther001.com"]  # Replace with your desired domain name
+  set {
+    name  = "domainFilters"
+    value = "example.com"  # Update with your desired domain
+  }
 
-  depends_on = [aws_route53_record.website]
+  set {
+    name  = "aws.zoneType"
+    value = "public"
+  }
 }
 
-output "domain_name" {
-  value = aws_route53_zone.example.name
+resource "helm_release" "nginx_ingress" {
+  name       = "nginx-ingress"
+  namespace  = kubernetes_namespace.dev.metadata.0.name
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "nginx-ingress"
+  version    = "9.1.10"
+
+  set {
+    name  = "controller.service.externalTrafficPolicy"
+    value = "Local"
+  }
 }
 
-output "zone_id" {
-  value = aws_route53_zone.example.zone_id
-}
-
-output "acm_certificate_arn" {
-  value = aws_acm_certificate.example.arn
+output "cluster_id" {
+  value = module.eks_cluster.cluster_id
 }
