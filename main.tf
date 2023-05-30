@@ -116,15 +116,10 @@ resource "helm_release" "external_dns" {
   chart      = "external-dns"
   version    = "6.20.3"
 
-  set {
-    name  = "txtOwnerId"
-    value = var.unique_owner_id
-  }
-
-  set {
-    name  = "domainFilters"
-    value = "example.com"  # Update with your desired domain
-  }
+#   set {
+#     name  = "domainFilters"
+#     value = "example.com"  # Update with your desired domain
+#   }
 
   set {
     name  = "aws.zoneType"
