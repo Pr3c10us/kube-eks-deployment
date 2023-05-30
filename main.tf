@@ -39,37 +39,61 @@ module "eks_cluster" {
   subnet_ids    = module.vpc.private_subnets
   #kubeconfig_aws_authenticator_additional_args = ["--region", data.aws_region.current.name]
 
-  worker_groups = [
-    {
-      name              = "workers"
-      instance_type     = "t3.micro"
-      desired_capacity  = 3
-      min_size          = 3
-      max_size          = 3
-      subnets           = module.vpc.private_subnets
-      additional_tags   = {
-        "Environment" = "dev"
-      }
-    }
-  ]
-}
+  eks_managed_node_groups = {
+  blue = {}
+  green = {
+    min_size     = 1
+    max_size     = 3
+    desired_size = 3
 
-data "aws_eks_cluster_auth" "cluster_auth" {
-  name = module.eks_cluster.cluster_id
+    instance_types = ["t3.micro"]
+#     capacity_type  = "SPOT"
+#     labels = {
+#       Environment = "test"
+#       GithubRepo  = "terraform-aws-eks"
+#       GithubOrg   = "terraform-aws-modules"
+#     }
+
+#     taints = {
+#       dedicated = {
+#         key    = "dedicated"
+#         value  = "gpuGroup"
+#         effect = "NO_SCHEDULE"
+#       }
+#     }
+
+    update_config = {
+      max_unavailable_percentage = 33 # or set `max_unavailable`
+    }
+
+    tags = {
+      ExtraTag = "example"
+    }
+  }
 }
 
 provider "kubernetes" {
-  host                   = data.aws_eks_cluster.eks.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.eks.token
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
 }
 
 provider "helm" {
   kubernetes {
-    host                   = data.aws_eks_cluster.eks.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.eks.token
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
     }
+  }
 }
 
 resource "kubernetes_namespace" "dev" {
