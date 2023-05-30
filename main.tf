@@ -33,7 +33,7 @@ resource "null_resource" "upload_html" {
 }
 
 # Create a Route53 zone
-resource "aws_route53_zone" "s3" {
+resource "aws_route53_zone" "example" {
   name = "opeluther001.com"  # Replace with your desired domain name
 }
 
@@ -49,8 +49,8 @@ resource "aws_acm_certificate" "example" {
 
 # Create a Route53 record pointing to the S3 bucket
 resource "aws_route53_record" "website" {
-  zone_id = aws_route53_zone.s3.zone_id
-  name    = var.domain_name
+  zone_id = aws_route53_zone.example.zone_id
+  name    = "opeluther001.com"  # Replace with your desired domain name
   type    = "A"
 
   alias {
@@ -59,7 +59,7 @@ resource "aws_route53_record" "website" {
     evaluate_target_health = false
   }
 
-  depends_on = [aws_s3_bucket.website, aws_route53_zone.s3]
+  depends_on = [aws_s3_bucket.website, aws_route53_zone.example]
 }
 
 # Create the CloudFront distribution for the S3 bucket
@@ -99,7 +99,7 @@ resource "aws_cloudfront_distribution" "website" {
     ssl_support_method  = "sni-only"
   }
 
-  aliases = [var.domain_name]
+  aliases = ["opeluther001.com"]  # Replace with your desired domain name
 
   depends_on = [aws_route53_record.website]
 }
