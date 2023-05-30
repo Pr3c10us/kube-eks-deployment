@@ -71,6 +71,7 @@ module "eks_cluster" {
     }
   }
 }
+}
 
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
