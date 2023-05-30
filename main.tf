@@ -1,10 +1,10 @@
 data "aws_region" "current" {}
 data "aws_eks_cluster" "eks" {
-  name = module.eks_cluster.cluster_id
+  name = module.eks.cluster_id
 }
 
 data "aws_eks_cluster_auth" "eks" {
-  name = module.eks_cluster.cluster_id
+  name = module.eks.cluster_id
 }
 
 
@@ -28,7 +28,7 @@ module "vpc" {
   single_nat_gateway = true
 }
 
-module "eks_cluster" {
+module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 19.0"
 
@@ -146,5 +146,5 @@ resource "helm_release" "nginx_ingress" {
 }
 
 output "cluster_id" {
-  value = module.eks_cluster.cluster_id
+  value = module.eks.cluster_id
 }
