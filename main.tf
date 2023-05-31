@@ -161,74 +161,74 @@ resource "helm_release" "nginx_ingress" {
   }
 }
 
-resource "kubernetes_secret" "app_secret" {
-  metadata {
-    name      = "app-secret"
-    namespace = kubernetes_namespace.dev.metadata.0.name
-  }
+# resource "kubernetes_secret" "app_secret" {
+#   metadata {
+#     name      = "app-secret"
+#     namespace = kubernetes_namespace.dev.metadata.0.name
+#   }
 
-  string_data = {
-    "sensitive_data" = "Oswald"
-  }
+#   string_data = {
+#     "sensitive_data" = "Oswald"
+#   }
 
-  type = "Opaque"
-}
+#   type = "Opaque"
+# }
 
-resource "helm_release" "python_api_dev" {
-  name       = "python-api-dev"
-  namespace  = kubernetes_namespace.dev.metadata.0.name
-  repository = "https://charts.example.com/my-charts"
-  chart      = "python-api"
-  version    = "1.0.0"
+# resource "helm_release" "python_api_dev" {
+#   name       = "python-api-dev"
+#   namespace  = kubernetes_namespace.dev.metadata.0.name
+#   repository = "https://charts.example.com/my-charts"
+#   chart      = "python-api"
+#   version    = "1.0.0"
 
-  set {
-    name  = "extraDays[0].name"
-    value = "Oswald"
-  }
+#   set {
+#     name  = "extraDays[0].name"
+#     value = "Oswald"
+#   }
 
-  set {
-    name  = "extraDays[0].id"
-    value = "8"
-  }
+#   set {
+#     name  = "extraDays[0].id"
+#     value = "8"
+#   }
 
-  set {
-    name      = "extraDays[0].sensitive_data"
-    valueFrom = kubernetes_secret.app_secret.metadata[0].name
-  }
+#   set {
+#     name      = "extraDays[0].sensitive_data"
+#     valueFrom = kubernetes_secret.app_secret.metadata[0].name
+#   }
 
-  set {
-    name  = "ingress.host"
-    value = "dev.foo"  # Update with the desired host
-  }
-}
+#   set {
+#     name  = "ingress.host"
+#     value = "dev.foo"  # Update with the desired host
+#   }
+# }
 
-resource "helm_release" "python_api_prod" {
-  name       = "python-api-prod"
-  namespace  = kubernetes_namespace.prod.metadata.0.name
-  repository = "https://charts.example.com/my-charts"
-  chart      = "python-api"
-  version    = "1.0.0"
+# resource "helm_release" "python_api_prod" {
+#   name       = "python-api-prod"
+#   namespace  = kubernetes_namespace.prod.metadata.0.name
+#   repository = "https://charts.example.com/my-charts"
+#   chart      = "python-api"
+#   version    = "1.0.0"
 
-  set {
-    name  = "extraDays[0].name"
-    value = "Oswald"
-  }
+#   set {
+#     name  = "extraDays[0].name"
+#     value = "Oswald"
+#   }
 
-  set {
-    name  = "extraDays[0].id"
-    value = "9"
-  }
+#   set {
+#     name  = "extraDays[0].id"
+#     value = "9"
+#   }
 
-  set {
-    name      = "extraDays[0].sensitive_data"
-    valueFrom = kubernetes_secret.app_secret.metadata[0].name
-  }
+#   set {
+#     name      = "extraDays[0].sensitive_data"
+#     valueFrom = kubernetes_secret.app_secret.metadata[0].name
+#   }
 
-  set {
-    name  = "ingress.host"
-    value = "prod.foo"  # Update with the desired host
-  }
-}
+#   set {
+#     name  = "ingress.host"
+#     value = "prod.foo"  # Update with the desired host
+#   }
+# }
 
 output "cluster_id" {
   value = module.eks_cluster.cluster_id
