@@ -1,13 +1,4 @@
 data "aws_region" "current" {}
-data "aws_eks_cluster" "eks" {
-  name = module.eks_cluster.cluster_id
-}
-
-data "aws_eks_cluster_auth" "eks" {
-  name = module.eks_cluster.cluster_id
-}
-
-
 
 provider "aws" {
   region = "us-east-1"
@@ -37,35 +28,85 @@ module "eks_cluster" {
 
   vpc_id        = module.vpc.vpc_id
   subnet_ids    = module.vpc.private_subnets
-  #kubeconfig_aws_authenticator_additional_args = ["--region", data.aws_region.current.name]
-
-
-    
-    
-  }
 }
+
+resource "aws_launch_template" "worker_nodes" {
+  name                   = "my-eks-worker-nodes"
+  image_id               = "ami-0c94855ba95c71c99"  # Replace with the desired worker node AMI ID
+  instance_type          = "t3.medium"  # Replace with the desired instance type
+  iam_instance_profile   = aws_iam_instance_profile.worker_nodes.name
+  key_name               = "my-keypair"  # Replace with the desired SSH key name
+  security_group_ids     = [aws_security_group.worker_nodes.id]
+  user_data              = <<-EOF
+    #!/bin/bash
+    echo ECS_CLUSTER=${module.eks_cluster.cluster_id} >> /etc/ecs/ecs.config
+    EOF
+}
+
+resource "aws_iam_instance_profile" "worker_nodes" {
+  name = "my-eks-worker-nodes"
+  role = aws_iam_role.worker_nodes.id
+}
+
+resource "aws_iam_role" "worker_nodes" {
+  name = "my-eks-worker-nodes"
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_security_group" "worker_nodes" {
+  name        = "my-eks-worker-nodes"
+  description = "Security group for EKS worker nodes"
+
+  vpc_id = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  host                   = module.eks_cluster.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks_cluster.cluster_certificate_authority_data)
 
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    args        = ["eks", "get-token", "--cluster-name", module.eks_cluster.cluster_name]
   }
 }
 
 provider "helm" {
   kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    host                   = module.eks_cluster.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks_cluster.cluster_certificate_authority_data)
 
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      args        = ["eks", "get-token", "--cluster-name", module.eks_cluster.cluster_name]
     }
   }
 }
@@ -91,7 +132,7 @@ resource "helm_release" "external_dns" {
 
   set {
     name  = "txtOwnerId"
-    value = var.unique_owner_id
+    value = "YOUR_UNIQUE_OWNER_ID"  # Update with your unique owner ID
   }
 
   set {
@@ -115,6 +156,75 @@ resource "helm_release" "nginx_ingress" {
   set {
     name  = "controller.service.externalTrafficPolicy"
     value = "Local"
+  }
+}
+
+resource "kubernetes_secret" "app_secret" {
+  metadata {
+    name      = "app-secret"
+    namespace = kubernetes_namespace.dev.metadata.0.name
+  }
+
+  string_data = {
+    "sensitive_data" = "Oswald"
+  }
+
+  type = "Opaque"
+}
+
+resource "helm_release" "python_api_dev" {
+  name       = "python-api-dev"
+  namespace  = kubernetes_namespace.dev.metadata.0.name
+  repository = "https://charts.example.com/my-charts"
+  chart      = "python-api"
+  version    = "1.0.0"
+
+  set {
+    name  = "extraDays[0].name"
+    value = "Oswald"
+  }
+
+  set {
+    name  = "extraDays[0].id"
+    value = "8"
+  }
+
+  set {
+    name      = "extraDays[0].sensitive_data"
+    valueFrom = kubernetes_secret.app_secret.metadata[0].name
+  }
+
+  set {
+    name  = "ingress.host"
+    value = "dev.foo"  # Update with the desired host
+  }
+}
+
+resource "helm_release" "python_api_prod" {
+  name       = "python-api-prod"
+  namespace  = kubernetes_namespace.prod.metadata.0.name
+  repository = "https://charts.example.com/my-charts"
+  chart      = "python-api"
+  version    = "1.0.0"
+
+  set {
+    name  = "extraDays[0].name"
+    value = "Oswald"
+  }
+
+  set {
+    name  = "extraDays[0].id"
+    value = "9"
+  }
+
+  set {
+    name      = "extraDays[0].sensitive_data"
+    valueFrom = kubernetes_secret.app_secret.metadata[0].name
+  }
+
+  set {
+    name  = "ingress.host"
+    value = "prod.foo"  # Update with the desired host
   }
 }
 
