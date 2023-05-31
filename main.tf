@@ -39,36 +39,9 @@ module "eks_cluster" {
   subnet_ids    = module.vpc.private_subnets
   #kubeconfig_aws_authenticator_additional_args = ["--region", data.aws_region.current.name]
 
-  eks_managed_node_groups = {
-  blue = {}
-  green = {
-    min_size     = 1
-    max_size     = 3
-    desired_size = 3
 
-    instance_types = ["t3.micro"]
-#     capacity_type  = "SPOT"
-#     labels = {
-#       Environment = "test"
-#       GithubRepo  = "terraform-aws-eks"
-#       GithubOrg   = "terraform-aws-modules"
-#     }
-
-#     taints = {
-#       dedicated = {
-#         key    = "dedicated"
-#         value  = "gpuGroup"
-#         effect = "NO_SCHEDULE"
-#       }
-#     }
-
-    update_config = {
-      max_unavailable_percentage = 33 # or set `max_unavailable`
-    }
-
-    tags = {
-      ExtraTag = "example"
-    }
+    
+    
   }
 }
 }
