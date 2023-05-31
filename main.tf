@@ -36,7 +36,7 @@ resource "aws_launch_template" "worker_nodes" {
   instance_type          = "t3.medium"  # Replace with the desired instance type
   iam_instance_profile   = aws_iam_instance_profile.worker_nodes.name
   key_name               = "my-keypair"  # Replace with the desired SSH key name
-  security_group_ids     = [aws_security_group.worker_nodes.id]
+  security_group_names     = [aws_security_group.worker_nodes.id]
   user_data              = <<-EOF
     #!/bin/bash
     echo ECS_CLUSTER=${module.eks_cluster.cluster_id} >> /etc/ecs/ecs.config
